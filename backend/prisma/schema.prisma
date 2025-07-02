@@ -1,0 +1,40 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+model Presentation {
+  id        Int     @id @default(autoincrement())
+  title     String  
+  slides    Slide[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Slide {
+  id             Int       @id @default(autoincrement())
+  elements       Element[]
+  style          Json     
+  order          Int       
+  presentation_id Int
+  presentation   Presentation @relation(fields: [presentation_id], references: [id])
+}
+
+model Element {
+  id        Int      @id @default(autoincrement())
+  type      String   
+  content   String?  
+  src       String? 
+  width     Int?
+  height    Int?
+  position  Json   
+  style     Json     
+  order     Int      
+  slide_id   Int
+  slide     Slide    @relation(fields: [slide_id], references: [id])
+}
