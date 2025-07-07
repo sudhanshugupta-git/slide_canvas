@@ -23,7 +23,7 @@ CREATE TABLE `Element` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `type` VARCHAR(191) NOT NULL,
     `content` VARCHAR(191) NULL,
-    `src` VARCHAR(191) NULL,
+    `src` MEDIUMTEXT NULL,
     `width` INTEGER NULL,
     `height` INTEGER NULL,
     `position` JSON NOT NULL,

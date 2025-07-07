@@ -8,12 +8,26 @@ export const addSlide = async (presentationId, data) => {
   return res.data;
 };
 
+// export const updateSlide = async (presentationId, order) => {
+//   const res = await axios.patch(
+//     `${API}/slides/presentation/${presentationId}`,
+//     { order }
+//   );
+//   return res.data;
+// };
+
 // Update a slide by ID
 export const updateSlideByOrder = async (presentationId, order, style) => {
   const res = await axios.patch(
     `${API}/slides/presentation/${presentationId}/order/${order}`,
     { style }
   );
+  return res.data;
+};
+
+
+export const getSlides = async (presentationId) => {
+  const res = await axios.get(`${API}/slides/presentation/${presentationId}/`);
   return res.data;
 };
 
@@ -24,3 +38,4 @@ export const deleteSlideByOrder = async (presentationId, order) => {
   );
   return res.data;
 };
+

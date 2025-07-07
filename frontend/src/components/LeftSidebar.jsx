@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import html2canvas from "html2canvas";
-import { updatePresentation } from "../services/presentations";
+import {getAllPresentations, updatePresentation } from "../services/presentations";
+import { useNavigate } from "react-router-dom";
 
 const LeftSidebar = ({
   slides,
@@ -10,11 +11,11 @@ const LeftSidebar = ({
   scrollToSlide,
   presentationId,
 }) => {
+  const navigate = useNavigate();
+
   // Sidebar collapse state
   const [isCollapsed, setIsCollapsed] = useState(false);
   const toggleSidebar = () => setIsCollapsed((prev) => !prev);
-
-
 
   // Presentation title state and edit mode
   const [title, setTitle] = useState("Untitled");
@@ -33,8 +34,6 @@ const LeftSidebar = ({
     }
   };
 
-  
-
   // Store slide thumbnails for sidebar preview
   const [slideThumbnails, setSlideThumbnails] = useState({});
   useEffect(() => {
@@ -51,6 +50,14 @@ const LeftSidebar = ({
     });
   }, [slides]);
 
+  useEffect(() => {
+  if (!presentationId) return;
+  getAllPresentations().then((presentations) => {
+    const current = presentations.find((p) => p.id === presentationId);
+    if (current) setTitle(current.title);
+  });
+}, [presentationId]);
+
   return (
     <div
       className={`${
@@ -58,27 +65,15 @@ const LeftSidebar = ({
       } bg-[#2A2A2A] p-4 border-r border-gray-700 transition-all duration-300`}
     >
       {/* Sidebar header with title and collapse/expand button */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-2">
         {!isCollapsed && (
-          <div className="flex items-center space-x-1">
-            {isEditing ? (
-              <input
-                type="text"
-                value={title}
-                onChange={handleTitleChange}
-                onBlur={handleBlur}
-                autoFocus
-                className="text-lg font-semibold text-white px-1 py-1 rounded"
-              />
-            ) : (
-              <h2 className="text-lg font-semibold text-white">{title}</h2>
-            )}
-            <i
-              className="uil uil-edit text-lg cursor-pointer p-1 text-white hover:text-gray-300 active:scale-95"
-              title="Edit Title"
-              onClick={() => setIsEditing(true)}
-            ></i>
-          </div>
+          <button
+            className="flex items-center gap-1 bg-[#23272a] hover:bg-blue-600 text-white px-1 rounded transition shadow border border-gray-700"
+            onClick={() => navigate("/")}
+          >
+            <i className="uil uil-folder-open text-sm"></i>
+            <span className="font-medium">Files</span>
+          </button>
         )}
         {isCollapsed ? (
           <div className="flex justify-center items-center h-full w-full">
@@ -96,10 +91,33 @@ const LeftSidebar = ({
           ></i>
         )}
       </div>
+
+      {!isCollapsed && (
+        <div className="flex items-center space-x-1">
+          {isEditing ? (
+            <input
+              type="text"
+              value={title}
+              onChange={handleTitleChange}
+              onBlur={handleBlur}
+              autoFocus
+              className="text-sm font-semibold text-white px-1 py-1 rounded"
+            />
+          ) : (
+            <h2 className="text-lg font-semibold text-white">{title}</h2>
+          )}
+          <i
+            className="uil uil-edit text-lg cursor-pointer p-1 text-white hover:text-gray-300 active:scale-95"
+            title="Edit Title"
+            onClick={() => setIsEditing(true)}
+          ></i>
+        </div>
+      )}
+
       {/* New Slide Button */}
       {!isCollapsed && (
         <>
-          <div className="mt-4 flex justify-center">
+          <div className="mt-2 flex justify-center">
             <button
               className="text-[#ECEDEB] cursor-pointer flex items-center border rounded py-0.5 px-5 gap-2 hover:text-gray-300 active:scale-95 transition-transform duration-100"
               onClick={addNewSlide}
@@ -110,7 +128,7 @@ const LeftSidebar = ({
           </div>
 
           {/* Divider */}
-          <div className="border-b border-[#D0D4CB] border-opacity-20 mt-5 mb-3"></div>
+          <div className="border-b border-[#D0D4CB] border-opacity-20 mt-4 mb-3"></div>
 
           {/* Slide Thumbnails List */}
           <div className="overflow-y-auto max-h-[78vh] pr-1 sidebar-scroll">
@@ -135,7 +153,7 @@ const LeftSidebar = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      deleteSlide(slide.id);
+                      deleteSlide(slide);
                     }}
                     className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 active:scale-95"
                     title="Delete Slide"

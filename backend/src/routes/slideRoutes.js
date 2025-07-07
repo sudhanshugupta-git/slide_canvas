@@ -1,13 +1,23 @@
 import express from 'express';
-import { updateSlideByOrder, deleteSlideByOrder } from '../controllers/slideController.js';
+import { updateSlideByOrder, deleteSlideByOrder, getSlides, updateSlide } from '../controllers/slideController.js';
 import { addElement } from '../controllers/elementController.js';
 
 const router = express.Router();
 
-// router.patch('/:id', updateSlide);
-router.patch('/presentation/:presentationId/order/:order', updateSlideByOrder);
-// router.delete('/:id', deleteSlide);
-router.delete('/presentation/:presentationId/order/:order', deleteSlideByOrder);
+// GET: Retrieve slides of a presentation
+router.get('/presentation/:presentation_id', getSlides);
+
+// POST: Add an element to a specific slide
 router.post('/:slideId/elements', addElement);
+
+// PATCH: Update slide by presentation ID
+// router.patch('/presentation/:presentation_id', updateSlide);
+
+// PATCH: Update slide by order within a presentation
+router.patch('/presentation/:presentationId/order/:order', updateSlideByOrder);
+
+// DELETE: Delete slide by order within a presentation
+router.delete('/presentation/:presentationId/order/:order', deleteSlideByOrder);
+
 
 export default router;

@@ -1,5 +1,20 @@
 import prisma from '../prisma.js';
 
+export const getSlides = async (req, res) => {
+  try {
+    const presentation_id = Number(req.params.presentation_id);
+    const slides = await prisma.slide.findMany({
+      where: { presentation_id},
+      include:{
+        elements:true
+      }
+    });
+    res.json(slides);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const addSlide = async (req, res) => {
   try{
     const presentation_id = Number(req.params.id);
@@ -13,19 +28,19 @@ export const addSlide = async (req, res) => {
   }
 };
 
-// export const updateSlide = async (req, res) => {
-//   try{
-//     const id = Number(req.params.id);
-//     const { style, order } = req.body;
-//     const slide = await prisma.slide.update({
-//       where: { id },
-//       data: { style, order }
-//     });
-//     res.json(slide);
-//   }catch(error){
-//     res.status(500).json({ error: error.message });
-//   }
-// };
+export const updateSlide = async (req, res) => {
+  try{
+    const presentation_id = Number(req.params.presentation_id);
+    const { style, order } = req.body;
+    const slide = await prisma.slide.update({
+      where: { presentation_id },
+      data: { style, order }
+    });
+    res.json(slide);
+  }catch(error){
+    res.status(500).json({ error: error.message });
+  }
+};
 
 export const updateSlideByOrder = async (req, res) => {
   try {
@@ -50,19 +65,6 @@ export const updateSlideByOrder = async (req, res) => {
   }
 };
 
-// export const deleteSlide = async (req, res) => {
-//   try{
-//     const id = Number(req.params.id);
-//     // First, delete all elements belonging to this slide
-//     await prisma.element.deleteMany({ where: { slide_id: id } });
-
-//     // Then, delete the slide itself
-//     await prisma.slide.delete({ where: { id } });
-//     res.json({ success: true });
-//   }catch(error){
-//     res.status(500).json({ error: error.message });
-//   }
-// };
 
 export const deleteSlideByOrder = async (req, res) => {
   try {

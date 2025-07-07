@@ -29,7 +29,7 @@ model Element {
   id        Int      @id @default(autoincrement())
   type      String   
   content   String?  
-  src       String? 
+  src       String? @db.MediumText
   width     Int?
   height    Int?
   position  Json   

@@ -1,17 +1,8 @@
-import prisma from '../prisma.js';
+import prisma from "../prisma.js";
 
 export const getPresentation = async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    const presentation = await prisma.presentation.findUnique({
-      where: { id },
-      include: {
-        slides: {
-          orderBy: { order: "asc" },
-          include: { elements: { orderBy: { order: "asc" } } },
-        },
-      },
-    });
+    const presentation = await prisma.presentation.findMany();
     res.json(presentation);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -39,6 +30,28 @@ export const updatePresentation = async (req, res) => {
       data: { title },
     });
     res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
+export const deletePresentation = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    
+    const slides = await prisma.slide.findMany({ where: { presentation_id: id } });
+    // Delete all elements
+    for (const slide of slides) {
+      await prisma.element.deleteMany({ where: { slide_id: slide.id } });
+    }
+
+    // Delete all slides
+    await prisma.slide.deleteMany({ where: { presentation_id: id } });
+    
+    // Finally delete the presentation
+    await prisma.presentation.delete({ where: { id } });
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

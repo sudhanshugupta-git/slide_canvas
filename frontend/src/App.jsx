@@ -1,14 +1,28 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import LeftSidebar from "./components/LeftSidebar";
-import Toolbar from "./components/Toolbar";
 import SlideEditor from "./components/SlideEditor";
+import Toolbar from "./components/Toolbar";
 import { ToolbarProvider } from "./context/ToolbarContext";
-import * as slideAPI from "./services/slides";
 
-function App() {
+// services
+import * as slideAPI from "./services/slides";
+import PresentationsHome from "./components/PresentationsHome";
+import * as elementAPI from "./services/elements";
+
+function PresentationEditorWrapper() {
+  const { id } = useParams();
+  const presentationId = Number(id);
+
   const [slides, setSlides] = useState([]);
-  const [count, setCount] = useState(0);    // assign unique id to each slide
-  const [currentIndex, setCurrentIndex] = useState(0);   // active slide
+  const [count, setCount] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedElementId, setSelectedElementId] = useState(null);
   const slideRefs = useRef([]);
   const [presentMode, setPresentMode] = useState(false);
@@ -18,73 +32,127 @@ function App() {
     slideRefs.current[index]?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const addTextElement = () => {
-    const updatedSlides = [...slides];
-    const activeSlide = updatedSlides[currentIndex];
-
-    activeSlide.elements.push({
-      type: "text",
-      content: "New Text",
-      style: {},
-      id: Date.now(),
-    });
-
-    setSlides(updatedSlides);
+  // Fetch slides for this presentation
+  const getSlides = async () => {
+    try {
+      const data = await slideAPI.getSlides(presentationId);
+      setSlides([...data]);
+    } catch (err) {
+      console.log("something went wrong!", err);
+    }
   };
 
+  // Add new slide
+  const addNewSlide = async () => {
+    const newOrder = (slides[slides.length - 1]?.order ?? -1) + 1;
+    console.log("New slide order:", newOrder);
 
-  const addImageElement = (base64Image) => {
-    const updatedSlides = [...slides];
-    const activeSlide = updatedSlides[currentIndex];
-    activeSlide.elements.push({
-      type: "image",
-      src: base64Image,
-      width: 200,
-      height: 150,
-      style: {
-        backgroundSize: "cover",
-      },
-      id: Date.now(),
+    const newSlide = {
+      id: count + 1,
+      elements: [],
+      style: { backgroundColor: "#ffffff" },
+      order: newOrder,
+    };
+
+    await slideAPI.addSlide(presentationId, {
+      style: { backgroundColor: "#ffffff" },
+      order: newOrder,
     });
 
-    setSlides(updatedSlides);
+    setCount(count + 1);
+    setSlides((prev) => [...prev, newSlide]);
   };
 
-  const updateElementContent = (id, newContent) => {
+  // Update element content
+  const updateElement = async (elementId, updatedFields) => {
+    // Update backend
+    await elementAPI.updateElement(elementId, updatedFields);
+
+    // Update frontend state
     setSlides((prevSlides) =>
       prevSlides.map((slide) => ({
         ...slide,
         elements: slide.elements.map((el) =>
-          el.id === id ? { content: newContent, ...el } : el
+          el.id === elementId ? { ...el, ...updatedFields } : el
         ),
       }))
     );
   };
 
-  const addNewSlide = async () => {
-    const newSlide = {
-      id: count + 1,
-      elements: [],
-      style: {backgroundColor: "#ffffff"},
-    };
-    await slideAPI.addSlide(1, {
-      style: { backgroundColor: "#ffffff" },
-      order: slides.length,
-    });
-    setCount(count + 1);
-    setSlides((prev) => [...prev, newSlide]);
+  // Delete slide
+  const handleDeleteSlide = async (slideToDelete) => {
+    await slideAPI.deleteSlideByOrder(presentationId, slideToDelete.order);
+    getSlides();
+    // setSlides((prevSlides) =>
+    //   prevSlides.filter((slide) => slide.order !== slideToDelete.order)
+    // );
   };
 
+  useEffect(() => {
+    const handleKeyDown = async (e) => {
+      if (e.key === "Delete" && selectedElementId) {
+        try {
+          await elementAPI.deleteElement(selectedElementId);
 
+          // const updatedSlides = slides.map((slide) => {
+          //   const updatedElements = slide.elements?.filter(
+          //     (element) => element.id !== selectedElementId
+          //   );
+          //   return { ...slide, elements: updatedElements };
+          // });
 
-  // To delete a slide
-  const handleDeleteSlide = async (slideToDelete) => {
-    console.log(slideToDelete);
-  await slideAPI.deleteSlideByOrder(1, slideToDelete-1); 
-  setSlides((prevSlides) =>
-    prevSlides.filter((slide) => slide.id !== slideToDelete)
-  );
-};
+          // setSlides(updatedSlides);
+          // setSelectedElementId(null);
+          getSlides();
+        } catch (error) {
+          console.error("Failed to delete element:", error);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedElementId, slides]);
+
+  // Add text element
+  const addTextElement = async () => {
+    const updatedSlides = [...slides];
+    const activeSlide = updatedSlides[currentIndex];
+    // Call backend to add element
+    const newElement = await elementAPI.addElement(activeSlide.id, {
+      type: "text",
+      content: "New Text",
+      style: {},
+      order: activeSlide.elements.length,
+      position: {},
+    });
+    activeSlide.elements.push(newElement);
+    setSlides(updatedSlides);
+  };
+
+  // Add image element
+  const addImageElement = async (base64Image) => {
+    const updatedSlides = [...slides];
+    const activeSlide = updatedSlides[currentIndex];
+    console.log(activeSlide);
+    // Call backend to add element
+    const newElement = await elementAPI.addElement(activeSlide.id, {
+      type: "image",
+      src: base64Image,
+      width: 200,
+      height: 150,
+      style: { backgroundSize: "cover" },
+      order: activeSlide.elements.length,
+      position: {},
+    });
+    activeSlide.elements.push(newElement);
+    setSlides(updatedSlides);
+  };
+
+  useEffect(() => {
+    getSlides();
+    // eslint-disable-next-line
+  }, [presentationId]);
 
   return (
     <div className="flex h-screen">
@@ -95,7 +163,7 @@ function App() {
         currentIndex={currentIndex}
         setCurrentIndex={setCurrentIndex}
         scrollToSlide={scrollToSlide}
-        presentationId={1}
+        presentationId={presentationId}
       />
 
       <ToolbarProvider>
@@ -106,11 +174,13 @@ function App() {
           setSlides={setSlides}
           currentIndex={currentIndex}
           setCurrentIndex={setCurrentIndex}
-          updateElementContent={updateElementContent}
+          updateElement={updateElement}
           selectedElementId={selectedElementId}
           setSelectedElementId={setSelectedElementId}
           presentMode={presentMode}
           exitPresentMode={() => setPresentMode(false)}
+          getSlides={getSlides} // <-- Pass this
+          presentationId={presentationId} // <-- Pass this
         />
 
         <Toolbar
@@ -124,4 +194,30 @@ function App() {
   );
 }
 
-export default App;
+function App() {
+  const navigate = useNavigate();
+
+  const handleOpenPresentation = (presentationId) => {
+    navigate(`/presentation/${presentationId}`);
+  };
+
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <PresentationsHome onOpenPresentation={handleOpenPresentation} />
+        }
+      />
+      <Route path="/presentation/:id" element={<PresentationEditorWrapper />} />
+    </Routes>
+  );
+}
+
+export default function AppWithRouter() {
+  return (
+    <Router>
+      <App />
+    </Router>
+  );
+}
