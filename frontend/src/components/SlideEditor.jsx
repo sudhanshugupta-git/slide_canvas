@@ -2,28 +2,9 @@ import { useMemo, useEffect, useRef, useState } from "react";
 import { useToolbar } from "../context/ToolbarContext";
 import { useDebounce, useDebouncedValue } from "../hooks";
 import * as slideAPI from "../services/slides";
-import * as elementAPI from "../services/elements";
 import Moveable from "react-moveable";
 import { FaMagic, FaTimes, FaPaperPlane, FaSpinner } from "react-icons/fa";
-
-function normalizeAIData(aiData) {
-  // Ensure slide orders start at 0
-  const minOrder = Math.min(...aiData.slides.map((s) => Number(s.order)));
-  aiData.slides.forEach((s) => {
-    s.order = Number(s.order) - minOrder;
-  });
-
-  aiData.elements.forEach((el) => {
-    el.order = Number(el.order) || 0;
-    el.style = el.style || {};
-    el.position = el.position || {};
-    if (el.type === "image") {
-      el.src = el.content;
-      el.content = "";
-    }
-  });
-  return aiData;
-}
+import { useGemini } from "../hooks/useGemini"; // ✅ Import the custom hook
 
 const Editor = ({
   slides,
@@ -37,7 +18,7 @@ const Editor = ({
   scrollToSlide,
   presentMode,
   exitPresentMode,
-  getSlides, 
+  getSlides,
   presentationId,
 }) => {
   const containerRef = useRef(null);
@@ -45,7 +26,13 @@ const Editor = ({
 
   const [aiOpen, setAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
+
+  const { aiLoading, handleAIPrompt } = useGemini({
+    presentationId,
+    getSlides,
+    setAiOpen,
+    setAiPrompt,
+  });
 
   const {
     isBold,
@@ -98,146 +85,6 @@ const Editor = ({
   const debouncedUpdateContent = useDebounce(updateElement, 300);
   const debouncedStyles = useDebouncedValue(appliedStyles, 300);
 
-  // --- AI Prompt Handler ---
-  const handleAIPrompt = async () => {
-    if (!aiPrompt.trim()) return;
-    setAiLoading(true);
-
-    // Improved prompt for heading + description
-    const fullPrompt = `
-${aiPrompt}
-
-Return only valid JSON with two arrays: "slides" and "elements".
-Each slide: order, style (object).
-
-You are generating data for a slide presentation app.
-
-Return only valid JSON with two arrays: "slides" and "elements".
-
-Each slide must have:
-- order (number, starting from 0)
-- style (object, e.g. { "backgroundColor": "#fff" })
-
-Each element must have:
-- slideOrder (number, the order of the slide it belongs to)
-- type ("text")
-- content (string, for text elements: the text;)
-- style (object, e.g. { "fontSize": "36px", "color": "#222", "top": "20px", "left": "40px", "width": "300px", "height": "100px" })
-- position (object, e.g. { "x": 40, "y": 20 })
-- order (number, order of the element on the slide so that it does not overlap and looks visually appealing)
-
-For each slide, generate:
-- a heading (as a text element, large font, e.g. 32-40px)
-- a description (as a separate text element, smaller font, 1-2 sentences)
-- if relevant, an image element with a placeholder src and style (width, height)
-
-Ensure all elements on a slide have unique positions and do not overlap.
-
-Example:
-{
-  "slides": [
-    { "order": 0, "style": { "backgroundColor": "#fff" } }
-  ],
-  "elements": [
-    {
-      "slideOrder": 0,
-      "type": "text",
-      "content": "Heading Example",
-      "src": null,
-      "style": { "fontSize": "36px", "color": "#222", "top": "40px", "left": "40px" },
-      "position": { "x": 40, "y": 40 },
-      "order": 0
-    },
-    {
-      "slideOrder": 0,
-      "type": "text",
-      "content": "This is a description for the slide.",
-      "src": null,
-      "style": { "fontSize": "20px", "color": "#444", "top": "100px", "left": "40px" },
-      "position": { "x": 40, "y": 100 },
-      "order": 1
-    }
-  ]
-}
-
-Return only the JSON, no explanation or markdown.
-`;
-
-    try {
-      const url =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" +
-        import.meta.env.VITE_GEMINI_API_KEY;
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: fullPrompt }] }],
-        }),
-      });
-      const data = await res.json();
-      let jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      if (jsonText.startsWith("```json")) {
-        jsonText = jsonText.replace(/```json|```/g, "").trim();
-      }
-      if (!jsonText) throw new Error("No JSON text from Gemini");
-
-      let aiData;
-      try {
-        aiData = JSON.parse(jsonText);
-      } catch (e) {
-        console.error("Failed to parse Gemini JSON:", jsonText);
-        alert("AI did not return valid JSON. Try again.");
-        setAiLoading(false);
-        return;
-      }
-      aiData = normalizeAIData(aiData);
-      console.log("Normalized AI data:", aiData);
-
-      // 1. Add slides
-      const slideOrderToId = {};
-      for (const slide of aiData.slides) {
-        const addedSlide = await slideAPI.addSlide(presentationId, {
-          style: slide.style,
-          order: slide.order,
-        });
-        slideOrderToId[slide.order] = addedSlide.id;
-      }
-      console.log("Slides added, mapping:", slideOrderToId);
-
-      // 2. Add elements
-      for (const element of aiData.elements) {
-        const slideId = slideOrderToId[element.slideOrder ?? element.slideId];
-        if (!slideId) {
-          console.warn("No slideId for element:", element);
-          continue;
-        }
-        await elementAPI.addElement(slideId, {
-          type: element.type,
-          content: element.content,
-          src: element.src || null,
-          width: element.width || null,
-          height: element.height || null,
-          style: element.style,
-          position: element.position,
-          order: element.order,
-        });
-      }
-      console.log("Elements added.");
-
-      setAiPrompt("");
-      setAiOpen(false);
-      setAiLoading(false);
-      // Instead of reload, fetch new slides and update UI
-      if (getSlides) await getSlides();
-    } catch (err) {
-      console.error("AI handler error:", err);
-      alert("Failed to generate presentation.");
-      setAiLoading(false);
-    }
-  };
-
-  // --- Keyboard navigation ---
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "ArrowDown" && currentIndex < slides.length - 1) {
@@ -254,7 +101,6 @@ Return only the JSON, no explanation or markdown.
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex, slides.length]);
 
-  // --- Scroll detection for current visible slide ---
   useEffect(() => {
     const handleScroll = () => {
       const visibleSlide = slideRefs.current.reduce(
@@ -277,13 +123,11 @@ Return only the JSON, no explanation or markdown.
     return () => container?.removeEventListener("scroll", handleScroll);
   }, [slides]);
 
-  // --- Set background color of the current slide ---
   useEffect(() => {
     const updateBg = async () => {
       const currentSlide = slides[currentIndex];
       if (!currentSlide) return;
 
-      // Update local state
       const arr = slides.map((slide, idx) =>
         idx === currentIndex
           ? { ...slide, style: { ...slide.style, backgroundColor: bgColor } }
@@ -291,9 +135,8 @@ Return only the JSON, no explanation or markdown.
       );
       updateSlides(arr);
 
-      // Update backend
       await slideAPI.updateSlideByOrder(
-        currentSlide.presentation_id,
+        presentationId,
         currentSlide.order,
         { backgroundColor: bgColor }
       );
@@ -303,7 +146,6 @@ Return only the JSON, no explanation or markdown.
     // eslint-disable-next-line
   }, [bgColor]);
 
-  // --- Update background color when current slide changes ---
   useEffect(() => {
     const currentSlide = slides[currentIndex];
     if (currentSlide?.style?.backgroundColor) {
@@ -311,7 +153,6 @@ Return only the JSON, no explanation or markdown.
     }
   }, [currentIndex]);
 
-  // --- Apply styles to selected element when selectedElementId changes ---
   useEffect(() => {
     if (
       !selectedElementId ||
@@ -333,7 +174,6 @@ Return only the JSON, no explanation or markdown.
     }
   }, [selectedElementId]);
 
-  // --- Apply styles to the selected element when appliedStyles changes ---
   useEffect(() => {
     if (!selectedElementId) return;
 
@@ -368,7 +208,6 @@ Return only the JSON, no explanation or markdown.
     setSlides(updatedSlides);
   }, [debouncedStyles]);
 
-  // --- Presentation mode navigation ---
   useEffect(() => {
     if (!presentMode) return;
 
@@ -386,7 +225,6 @@ Return only the JSON, no explanation or markdown.
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [presentMode]);
 
-  // --- Presentation mode UI ---
   if (presentMode) {
     const slide = slides[currentIndex];
     return (
@@ -423,8 +261,6 @@ Return only the JSON, no explanation or markdown.
                   style={{
                     position: "absolute",
                     ...element.style,
-                    // width: `${element.style?.width || 100}px`,
-                    // height: `${element.style?.height || 100}px`,
                     pointerEvents: "none",
                     userSelect: "none",
                     objectFit: "contain",
@@ -439,7 +275,6 @@ Return only the JSON, no explanation or markdown.
     );
   }
 
-  // --- Main Editor UI ---
   return (
     <div
       ref={containerRef}
@@ -504,7 +339,7 @@ Return only the JSON, no explanation or markdown.
                       style={{
                         width: "100%",
                         height: "100%",
-                        objectFit: "contain",
+                        // objectFit: "contain",
                         display: "block",
                         pointerEvents: "none",
                       }}
@@ -525,7 +360,7 @@ Return only the JSON, no explanation or markdown.
               pinchable
               pinchOutside
               keepRatio={false}
-              roundable={true}
+              roundable
               isDisplayShadowRoundControls={"horizontal"}
               roundClickable={"control"}
               roundPadding={15}
@@ -583,7 +418,7 @@ Return only the JSON, no explanation or markdown.
         </div>
       ))}
 
-      {/* AI Button and Prompt at the bottom */}
+      {/* AI prompt input */}
       <div
         style={{
           position: "fixed",
@@ -615,7 +450,7 @@ Return only the JSON, no explanation or markdown.
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !aiLoading && !e.shiftKey) {
                     e.preventDefault();
-                    handleAIPrompt();
+                    handleAIPrompt(aiPrompt);
                   }
                 }}
                 disabled={aiLoading}
@@ -624,7 +459,7 @@ Return only the JSON, no explanation or markdown.
               />
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white rounded-full w-9 h-9 flex items-center justify-center transition"
-                onClick={handleAIPrompt}
+                onClick={() => handleAIPrompt(aiPrompt)}
                 disabled={aiLoading}
               >
                 {aiLoading ? (
@@ -638,7 +473,7 @@ Return only the JSON, no explanation or markdown.
         </div>
       </div>
 
-      {/* --- Add a loading overlay for better UX --- */}
+      {/* AI loading overlay */}
       {aiLoading && (
         <div
           style={{

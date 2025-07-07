@@ -45,7 +45,7 @@ function PresentationEditorWrapper() {
   // Add new slide
   const addNewSlide = async () => {
     const newOrder = (slides[slides.length - 1]?.order ?? -1) + 1;
-    console.log("New slide order:", newOrder);
+    // console.log("New slide order:", newOrder);
 
     const newSlide = {
       id: count + 1,
@@ -83,9 +83,6 @@ function PresentationEditorWrapper() {
   const handleDeleteSlide = async (slideToDelete) => {
     await slideAPI.deleteSlideByOrder(presentationId, slideToDelete.order);
     getSlides();
-    // setSlides((prevSlides) =>
-    //   prevSlides.filter((slide) => slide.order !== slideToDelete.order)
-    // );
   };
 
   useEffect(() => {
@@ -93,16 +90,6 @@ function PresentationEditorWrapper() {
       if (e.key === "Delete" && selectedElementId) {
         try {
           await elementAPI.deleteElement(selectedElementId);
-
-          // const updatedSlides = slides.map((slide) => {
-          //   const updatedElements = slide.elements?.filter(
-          //     (element) => element.id !== selectedElementId
-          //   );
-          //   return { ...slide, elements: updatedElements };
-          // });
-
-          // setSlides(updatedSlides);
-          // setSelectedElementId(null);
           getSlides();
         } catch (error) {
           console.error("Failed to delete element:", error);
