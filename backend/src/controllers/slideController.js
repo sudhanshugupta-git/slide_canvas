@@ -15,6 +15,17 @@ export const getSlides = async (req, res) => {
   }
 };
 
+
+export const getFirstSlide = async (req, res) => {
+  const presentation_id = Number(req.params.presentation_id);
+  const slide = await prisma.slide.findFirst({
+    where: { presentation_id },
+    orderBy: { order: "asc" },
+    include: { elements: true }
+  });
+  res.json(slide);
+};
+
 export const addSlide = async (req, res) => {
   try{
     const presentation_id = Number(req.params.id);

@@ -31,6 +31,12 @@ export const getSlides = async (presentationId) => {
   return res.data;
 };
 
+
+export const getFirstSlide = async (presentationId) => {
+  const res = await axios.get(`${API}/slides/presentation/${presentationId}/first`);
+  return res.data;
+};
+
 // Delete a slide by ID
 export const deleteSlideByOrder = async (presentationId, order) => {
   const res = await axios.delete(

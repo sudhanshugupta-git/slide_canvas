@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
-import html2canvas from "html2canvas";
-import {getAllPresentations, updatePresentation } from "../services/presentations";
+import {
+  getAllPresentations,
+  updatePresentation,
+} from "../services/presentations";
 import { useNavigate } from "react-router-dom";
+import useSlideThumbnails from "../hooks/useSlidePreviews";
 
 const LeftSidebar = ({
   slides,
@@ -35,28 +38,17 @@ const LeftSidebar = ({
   };
 
   // Store slide thumbnails for sidebar preview
-  const [slideThumbnails, setSlideThumbnails] = useState({});
-  useEffect(() => {
-    slides.forEach((slide, index) => {
-      const slideElement = document.querySelector(`.slide-${index}`);
-      if (slideElement) {
-        html2canvas(slideElement).then((canvas) => {
-          setSlideThumbnails((prev) => ({
-            ...prev,
-            [index]: canvas.toDataURL("image/png"),
-          }));
-        });
-      }
-    });
-  }, [slides]);
+  const slideThumbnails = useSlideThumbnails(slides);
+  // console.log("Slides:", slides);
+  // console.log("Slide thumbnails:", slideThumbnails);
 
   useEffect(() => {
-  if (!presentationId) return;
-  getAllPresentations().then((presentations) => {
-    const current = presentations.find((p) => p.id === presentationId);
-    if (current) setTitle(current.title);
-  });
-}, [presentationId]);
+    if (!presentationId) return;
+    getAllPresentations().then((presentations) => {
+      const current = presentations.find((p) => p.id === presentationId);
+      if (current) setTitle(current.title);
+    });
+  }, [presentationId]);
 
   return (
     <div

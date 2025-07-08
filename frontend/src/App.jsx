@@ -166,8 +166,8 @@ function PresentationEditorWrapper() {
           setSelectedElementId={setSelectedElementId}
           presentMode={presentMode}
           exitPresentMode={() => setPresentMode(false)}
-          getSlides={getSlides} // <-- Pass this
-          presentationId={presentationId} // <-- Pass this
+          getSlides={getSlides}
+          presentationId={presentationId} 
         />
 
         <Toolbar
