@@ -1,15 +1,15 @@
 import { useState } from "react";
 import * as slideAPI from "../services/slides";
 import * as elementAPI from "../services/elements";
+import { generateSlidesWithGemini } from "../services/gemini";
 
-// 🧠 Utility to normalize AI JSON data
+//  Utility to normalize AI JSON data
 const normalizeAIData = (aiData) => {
   const minOrder = Math.min(...aiData.slides.map((s) => Number(s.order)));
 
   aiData.slides.forEach((s) => {
     s.order = Number(s.order) - minOrder;
   });
-
   aiData.elements.forEach((el) => {
     el.order = Number(el.order) || 0;
     el.style = el.style || {};
@@ -19,11 +19,9 @@ const normalizeAIData = (aiData) => {
       el.content = "";
     }
   });
-
   return aiData;
 };
 
-// 📦 Prompt builder
 const buildPrompt = (userPrompt) => `
 ${userPrompt}
 
@@ -101,25 +99,12 @@ export const useGemini = ({
     const fullPrompt = buildPrompt(aiPrompt);
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${
-        import.meta.env.VITE_GEMINI_API_KEY
-      }`;
+      const data = await generateSlidesWithGemini(fullPrompt);
 
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: fullPrompt }] }],
-        }),
-      });
-
-      const data = await res.json();
       let jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
       if (jsonText.startsWith("```json")) {
         jsonText = jsonText.replace(/```json|```/g, "").trim();
       }
-
       if (!jsonText) throw new Error("No JSON text from Gemini");
 
       let aiData;

@@ -142,7 +142,7 @@ function PresentationEditorWrapper() {
   }, [presentationId]);
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen"> 
       <LeftSidebar
         slides={slides}
         addNewSlide={addNewSlide}

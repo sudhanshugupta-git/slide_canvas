@@ -4,7 +4,7 @@ import { useDebounce, useDebouncedValue } from "../hooks";
 import * as slideAPI from "../services/slides";
 import Moveable from "react-moveable";
 import { FaMagic, FaTimes, FaPaperPlane, FaSpinner } from "react-icons/fa";
-import { useGemini } from "../hooks/useGemini"; // ✅ Import the custom hook
+import { useGemini } from "../hooks/useGemini"; 
 
 const Editor = ({
   slides,
